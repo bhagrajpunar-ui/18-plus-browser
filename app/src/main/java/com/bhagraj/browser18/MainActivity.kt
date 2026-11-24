@@ -16,6 +16,7 @@ import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.webkit.URLUtil
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -99,22 +100,64 @@ class MainActivity : Activity() {
             }
         }
         web.webChromeClient = WebChromeClient()
-        web.setDownloadListener(DownloadListener { url, userAgent, _, mimeType, _ ->
-            try {
-                val request = DownloadManager.Request(Uri.parse(url))
-                    .setMimeType(mimeType)
-                    .addRequestHeader("User-Agent", userAgent)
-                    .addRequestHeader("Cookie", CookieManager.getInstance().getCookie(url) ?: "")
-                    .setTitle("18+ Browser download")
-                    .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                    .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, Uri.parse(url).lastPathSegment ?: "download")
-                (getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(request)
-                Toast.makeText(this, "डाउनलोड शुरू हुआ", Toast.LENGTH_SHORT).show()
-            } catch (_: Exception) { Toast.makeText(this, "डाउनलोड शुरू नहीं हो सका", Toast.LENGTH_SHORT).show() }
+
+        // Download direct media files when a website exposes a normal downloadable URL.
+        web.setDownloadListener(DownloadListener { url, userAgent, contentDisposition, mimeType, _ ->
+            downloadMedia(url, userAgent, contentDisposition, mimeType)
         })
+
+        // Long-press a video or downloadable media link to save it.
+        web.setOnLongClickListener {
+            val hit = web.hitTestResult
+            val mediaUrl = hit.extra
+            val isMedia = hit.type == WebView.HitTestResult.SRC_VIDEO_TYPE ||
+                hit.type == WebView.HitTestResult.VIDEO_TYPE ||
+                hit.type == WebView.HitTestResult.AUDIO_TYPE ||
+                hit.type == WebView.HitTestResult.SRC_ANCHOR_TYPE
+            if (isMedia && !mediaUrl.isNullOrBlank()) {
+                AlertDialog.Builder(this)
+                    .setItems(arrayOf("Download media")) { _, _ ->
+                        downloadMedia(mediaUrl, web.settings.userAgentString, null, null)
+                    }
+                    .show()
+                true
+            } else {
+                false
+            }
+        }
         root.addView(web, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(root)
         web.loadUrl("https://www.google.com")
+    }
+
+    private fun downloadMedia(url: String, userAgent: String?, contentDisposition: String?, mimeType: String?) {
+        try {
+            val uri = Uri.parse(url)
+            if (uri.scheme != "https" && uri.scheme != "http") {
+                Toast.makeText(this, "यह media link सीधे डाउनलोड नहीं हो सकता", Toast.LENGTH_LONG).show()
+                return
+            }
+            val fileName = URLUtil.guessFileName(url, contentDisposition, mimeType)
+                .replace(Regex("[^A-Za-z0-9._-]"), "_")
+                .ifBlank { "18plus_video" }
+            val request = DownloadManager.Request(uri)
+                .setTitle(fileName)
+                .setDescription("18+ Browser media download")
+                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                .setAllowedOverMetered(true)
+                .setAllowedOverRoaming(false)
+                .addRequestHeader("User-Agent", userAgent ?: web.settings.userAgentString)
+            val cookie = CookieManager.getInstance().getCookie(url)
+            if (!cookie.isNullOrBlank()) request.addRequestHeader("Cookie", cookie)
+            val referer = web.url
+            if (!referer.isNullOrBlank()) request.addRequestHeader("Referer", referer)
+            if (!mimeType.isNullOrBlank()) request.setMimeType(mimeType)
+            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+            (getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(request)
+            Toast.makeText(this, "डाउनलोड शुरू हुआ: $fileName", Toast.LENGTH_LONG).show()
+        } catch (_: Exception) {
+            Toast.makeText(this, "डाउनलोड शुरू नहीं हो सका", Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun makeButton(label: String, action: () -> Unit): Button =

@@ -22,6 +22,8 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import org.json.JSONArray
+import org.json.JSONTokener
 
 class MainActivity : Activity() {
     private lateinit var web: WebView
@@ -80,6 +82,7 @@ class MainActivity : Activity() {
         actions.addView(makeButton("Back") { if (web.canGoBack()) web.goBack() })
         actions.addView(makeButton("Next") { if (web.canGoForward()) web.goForward() })
         actions.addView(makeButton("Reload") { web.reload() })
+        actions.addView(makeButton("Video") { downloadCurrentVideo() })
         actions.addView(makeButton("Clear") { clearBrowsingData() })
         root.addView(actions)
         web = WebView(this)
@@ -125,6 +128,34 @@ class MainActivity : Activity() {
         root.addView(web, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(root)
         web.loadUrl("https://www.google.com")
+    }
+
+    // Aloha-style convenience: tap Video while a normal, directly downloadable video is playing.
+    // This intentionally does not extract or bypass DRM, encrypted streams, HLS/DASH manifests, or blob URLs.
+    private fun downloadCurrentVideo() {
+        web.evaluateJavascript(
+            "(function(){var v=Array.from(document.querySelectorAll('video')).find(x=>x.currentSrc||x.src);return JSON.stringify(v?{url:(v.currentSrc||v.src),mime:(v.currentType||v.type||'')} : null);})()"
+        ) { result ->
+            try {
+                val decoded = JSONTokener(result ?: "null").nextValue()
+                if (decoded == null || decoded.toString() == "null") {
+                    Toast.makeText(this, "इस पेज पर वीडियो लिंक नहीं मिला", Toast.LENGTH_LONG).show()
+                    return@evaluateJavascript
+                }
+                val video = decoded as org.json.JSONObject
+                val url = video.optString("url")
+                val mime = video.optString("mime").takeIf { it.isNotBlank() }
+                val path = Uri.parse(url).lastPathSegment?.lowercase() ?: ""
+                val directFile = listOf(".mp4", ".webm", ".mov", ".m4v", ".3gp", ".ogv").any { path.endsWith(it) }
+                if (url.startsWith("blob:") || path.endsWith(".m3u8") || path.endsWith(".mpd") || !directFile) {
+                    Toast.makeText(this, "यह वीडियो direct file नहीं है; साइट का अपना Download विकल्प इस्तेमाल करें", Toast.LENGTH_LONG).show()
+                    return@evaluateJavascript
+                }
+                downloadMedia(url, web.settings.userAgentString, null, mime)
+            } catch (_: Exception) {
+                Toast.makeText(this, "वीडियो लिंक पढ़ा नहीं जा सका", Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     private fun downloadMedia(url: String, userAgent: String?, contentDisposition: String?, mimeType: String?) {

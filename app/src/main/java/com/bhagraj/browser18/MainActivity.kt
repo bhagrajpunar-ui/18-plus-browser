@@ -110,10 +110,7 @@ class MainActivity : Activity() {
         web.setOnLongClickListener {
             val hit = web.hitTestResult
             val mediaUrl = hit.extra
-            val isMedia = hit.type == WebView.HitTestResult.SRC_VIDEO_TYPE ||
-                hit.type == WebView.HitTestResult.VIDEO_TYPE ||
-                hit.type == WebView.HitTestResult.AUDIO_TYPE ||
-                hit.type == WebView.HitTestResult.SRC_ANCHOR_TYPE
+            val isMedia = hit.type == WebView.HitTestResult.SRC_ANCHOR_TYPE
             if (isMedia && !mediaUrl.isNullOrBlank()) {
                 AlertDialog.Builder(this)
                     .setItems(arrayOf("Download media")) { _, _ ->

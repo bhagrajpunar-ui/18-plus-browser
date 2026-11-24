@@ -62,7 +62,7 @@ class MainActivity : Activity() {
         val searchRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         address = EditText(this).apply {
             hint = "Google पर खोजें या वेबसाइट लिखें"
-            singleLine = true
+            setSingleLine(true)
             textSize = 15f
             setPadding(14, 4, 14, 4)
             setBackgroundColor(Color.WHITE)

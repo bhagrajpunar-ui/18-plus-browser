@@ -109,21 +109,21 @@ class MainActivity : Activity() {
             downloadMedia(url, userAgent, contentDisposition, mimeType)
         })
 
-        // Long-press a video or downloadable media link to save it.
+        // Long-press handling: use the tapped link when available; otherwise
+        // offer the currently playing direct video URL from the page.
         web.setOnLongClickListener {
             val hit = web.hitTestResult
-            val mediaUrl = hit.extra
-            val isMedia = hit.type == WebView.HitTestResult.SRC_ANCHOR_TYPE
-            if (isMedia && !mediaUrl.isNullOrBlank()) {
+            val linkUrl = hit.extra
+            if (hit.type == WebView.HitTestResult.SRC_ANCHOR_TYPE && !linkUrl.isNullOrBlank()) {
                 AlertDialog.Builder(this)
-                    .setItems(arrayOf("Download media")) { _, _ ->
-                        downloadMedia(mediaUrl, web.settings.userAgentString, null, null)
+                    .setItems(arrayOf("Download link")) { _, _ ->
+                        downloadMedia(linkUrl, web.settings.userAgentString, null, null)
                     }
                     .show()
-                true
             } else {
-                false
+                downloadCurrentVideo()
             }
+            true
         }
         root.addView(web, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(root)

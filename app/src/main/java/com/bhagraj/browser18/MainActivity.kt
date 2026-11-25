@@ -161,14 +161,16 @@ class MainActivity : Activity() {
                     typeface = Typeface.DEFAULT_BOLD
                     setTextColor(white)
                     gravity = Gravity.CENTER
-                    setPadding(8, 18, 8, 18)
+                    includeFontPadding = true
+                    minHeight = dp(88)
+                    setPadding(dp(10), dp(14), dp(10), dp(14))
                     setBackgroundColor(panel)
                     setOnClickListener {
                         if (name == "Web Browser") showBrowser() else showCategory(name)
                     }
                 }
-                val lp = LinearLayout.LayoutParams(0, 100, 1f)
-                lp.setMargins(4, 4, 4, 4)
+                val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                lp.setMargins(dp(4), dp(4), dp(4), dp(4))
                 row.addView(card, lp)
             }
             page.addView(row)
@@ -188,6 +190,8 @@ class MainActivity : Activity() {
         page.addView(downloads)
         content.addView(scroll)
     }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     private fun addSectionTitle(parent: LinearLayout, text: String) {
         parent.addView(TextView(this).apply {
